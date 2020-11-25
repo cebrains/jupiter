@@ -1,0 +1,11 @@
+package model
+
+import "github.com/cebrains/jupiter/pkg/store/gorm"
+
+var (
+	DbHandler *gorm.DB
+)
+//Init ...
+func Init() {
+	DbHandler = gorm.StdConfig("postgres.dev").Build()
+}
