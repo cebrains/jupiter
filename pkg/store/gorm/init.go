@@ -1,7 +1,6 @@
 package gorm
 
 import (
-	"github.com/cebrains/jupiter/pkg/metric"
 	"github.com/cebrains/jupiter/pkg/server/governor"
 	"github.com/cebrains/jupiter/pkg/xlog"
 	"net/http"
@@ -32,14 +31,14 @@ func monitor() {
 	for {
 		time.Sleep(time.Second * 10)
 		Range(func(name string, db *DB) bool {
-			stats := db.DB().Stats()
-			metric.LibHandleSummary.Observe(float64(stats.Idle), name, "idle")
-			metric.LibHandleSummary.Observe(float64(stats.InUse), name, "inuse")
-			metric.LibHandleSummary.Observe(float64(stats.WaitCount), name, "wait")
-			metric.LibHandleSummary.Observe(float64(stats.OpenConnections), name, "conns")
-			metric.LibHandleSummary.Observe(float64(stats.MaxOpenConnections), name, "max_open_conns")
-			metric.LibHandleSummary.Observe(float64(stats.MaxIdleClosed), name, "max_idle_closed")
-			metric.LibHandleSummary.Observe(float64(stats.MaxLifetimeClosed), name, "max_lifetime_closed")
+			//stats := db.DB().Stats()
+			//metric.LibHandleSummary.Observe(float64(stats.Idle), name, "idle")
+			//metric.LibHandleSummary.Observe(float64(stats.InUse), name, "inuse")
+			//metric.LibHandleSummary.Observe(float64(stats.WaitCount), name, "wait")
+			//metric.LibHandleSummary.Observe(float64(stats.OpenConnections), name, "conns")
+			//metric.LibHandleSummary.Observe(float64(stats.MaxOpenConnections), name, "max_open_conns")
+			//metric.LibHandleSummary.Observe(float64(stats.MaxIdleClosed), name, "max_idle_closed")
+			//metric.LibHandleSummary.Observe(float64(stats.MaxLifetimeClosed), name, "max_lifetime_closed")
 			return true
 		})
 	}

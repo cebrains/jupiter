@@ -15,129 +15,98 @@
 package gorm
 
 import (
-	"context"
 	"errors"
+	v2 "github.com/cebrains/jupiter/pkg/store/gorm/v2"
 	"github.com/cebrains/jupiter/pkg/util/xdebug"
+	"github.com/cebrains/jupiter/pkg/xlog"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
+	gormLog "gorm.io/gorm/logger"
+	stdLog "log"
+	"os"
+	"strings"
+	"time"
 
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 	// mysql driver
-	_ "github.com/jinzhu/gorm/dialects/mysql"
+	_ "gorm.io/driver/mysql"
 	// postgres driver
-	_ "github.com/jinzhu/gorm/dialects/postgres"
+	_ "gorm.io/driver/postgres"
 )
 
 // SQLCommon ...
 type (
-	// SQLCommon alias of gorm.SQLCommon
-	SQLCommon = gorm.SQLCommon
-	// Callback alias of gorm.Callback
-	Callback = gorm.Callback
-	// CallbackProcessor alias of gorm.CallbackProcessor
-	CallbackProcessor = gorm.CallbackProcessor
-	// Dialect alias of gorm.Dialect
-	Dialect = gorm.Dialect
 	// Scope ...
-	Scope = gorm.Scope
+	Scope = gorm.Statement
 	// DB ...
 	DB = gorm.DB
 	// Model ...
 	Model = gorm.Model
-	// ModelStruct ...
-	ModelStruct = gorm.ModelStruct
-	// Field ...
-	Field = gorm.Field
-	// FieldStruct ...
-	StructField = gorm.StructField
-	// RowQueryResult ...
-	RowQueryResult = gorm.RowQueryResult
-	// RowsQueryResult ...
-	RowsQueryResult = gorm.RowsQueryResult
 	// Association ...
 	Association = gorm.Association
-	// Errors ...
-	Errors = gorm.Errors
-	// logger ...
-	Logger = gorm.Logger
 )
 
 var (
 	errSlowCommand = errors.New("database query slow command")
 
-	// IsRecordNotFoundError ...
-	IsRecordNotFoundError = gorm.IsRecordNotFoundError
-
 	// ErrRecordNotFound returns a "record not found error". Occurs only when attempting to query the database with a struct; querying with a slice won't return this error
 	ErrRecordNotFound = gorm.ErrRecordNotFound
-	// ErrInvalidSQL occurs when you attempt a query with invalid SQL
-	ErrInvalidSQL = gorm.ErrInvalidSQL
-	// ErrInvalidTransaction occurs when you are trying to `Commit` or `Rollback`
-	ErrInvalidTransaction = gorm.ErrInvalidTransaction
-	// ErrCantStartTransaction can't start transaction when you are trying to start one with `Begin`
-	ErrCantStartTransaction = gorm.ErrCantStartTransaction
-	// ErrUnaddressable unaddressable value
-	ErrUnaddressable = gorm.ErrUnaddressable
 )
-
-// WithContext ...
-func WithContext(ctx context.Context, db *DB) *DB {
-	db.InstantSet("_context", ctx)
-	return db
-}
 
 // Open ...
 func Open(dialect string, options *Config) (*DB, error) {
-	inner, err := gorm.Open(dialect, options.DSN)
+	var dbDialector gorm.Dialector
+	if val, err := getDbDialector(dialect, "Write", options.DSN); err != nil {
+		xlog.Panic("database not exists", xlog.FieldMod("gorm"), xlog.FieldErr(err), xlog.FieldKey(dialect))
+	} else {
+		dbDialector = val
+	}
+
+	logLevel := gormLog.Error
+	if options.Debug || xdebug.IsDevelopmentMode() {
+		logLevel = gormLog.Info
+	}
+	inner, err := gorm.Open(dbDialector, &gorm.Config{
+		SkipDefaultTransaction: true,
+		PrepareStmt:            true,
+		Logger:                 redefineLog(logLevel), //拦截、接管 gorm v2 自带日志
+	})
 	if err != nil {
+		//gorm 数据库驱动初始化失败
 		return nil, err
 	}
 
-	inner.LogMode(options.Debug)
-	// 设置默认连接配置
-	inner.DB().SetMaxIdleConns(options.MaxIdleConns)
-	inner.DB().SetMaxOpenConns(options.MaxOpenConns)
-
-	if options.ConnMaxLifetime != 0 {
-		inner.DB().SetConnMaxLifetime(options.ConnMaxLifetime)
+	// 为主连接设置连接池()
+	if rawDb, err := inner.DB(); err != nil {
+		return nil, err
+	} else {
+		rawDb.SetConnMaxIdleTime(time.Second * 30)
+		rawDb.SetConnMaxLifetime(options.ConnMaxLifetime)
+		rawDb.SetMaxIdleConns(options.MaxIdleConns)
+		rawDb.SetMaxOpenConns(options.MaxOpenConns)
+		return inner, nil
 	}
+}
 
-	if xdebug.IsDevelopmentMode() {
-		inner.LogMode(true)
+// 获取一个数据库方言(Dialector),通俗的说就是根据不同的连接参数，获取具体的一类数据库的连接指针
+func getDbDialector(dialect, readWrite, dsn string) (gorm.Dialector, error) {
+	var dbDialector gorm.Dialector
+	switch strings.ToLower(dialect) {
+	case "mysql":
+		dbDialector = mysql.Open(dsn)
+	case "postgres", "postgresql":
+		dbDialector = postgres.Open(dsn)
+	default:
+		return nil, errors.New("database not exists")
 	}
+	return dbDialector, nil
+}
 
-	replace := func(processor func() *gorm.CallbackProcessor, callbackName string, interceptors ...Interceptor) {
-		old := processor().Get(callbackName)
-		var handler = old
-		for _, inte := range interceptors {
-			handler = inte(options.dsnCfg, callbackName, options)(handler)
-		}
-		processor().Replace(callbackName, handler)
-	}
-
-	replace(
-		inner.Callback().Delete,
-		"gorm:delete",
-		options.interceptors...,
-	)
-	replace(
-		inner.Callback().Update,
-		"gorm:update",
-		options.interceptors...,
-	)
-	replace(
-		inner.Callback().Create,
-		"gorm:create",
-		options.interceptors...,
-	)
-	replace(
-		inner.Callback().Query,
-		"gorm:query",
-		options.interceptors...,
-	)
-	replace(
-		inner.Callback().RowQuery,
-		"gorm:row_query",
-		options.interceptors...,
-	)
-
-	return inner, err
+// 创建自定义日志模块，对 gorm 日志进行拦截、
+func redefineLog(logLevel gormLog.LogLevel) gormLog.Interface {
+	return v2.New(stdLog.New(os.Stdout, "\r\n", stdLog.LstdFlags), &gormLog.Config{
+		LogLevel:      logLevel,
+		Colorful:      true,
+		SlowThreshold: 100 * time.Millisecond,
+	})
 }

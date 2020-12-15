@@ -72,3 +72,4 @@ example/*/*/config-local.toml
 dump.rdb
 default.etcd
 pkg/datasource/apollo/.SampleApp_default
+#####

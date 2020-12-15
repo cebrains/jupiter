@@ -27,10 +27,8 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway v1.9.6 // indirect
-	github.com/jinzhu/gorm v1.9.12
 	github.com/json-iterator/go v1.1.10
 	github.com/labstack/echo/v4 v4.1.16
-	github.com/lib/pq v1.3.0
 	github.com/mitchellh/mapstructure v1.3.2
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/onsi/ginkgo v1.12.3 // indirect
@@ -66,6 +64,9 @@ require (
 	google.golang.org/genproto v0.0.0-20200122232147-0452cf42e150
 	google.golang.org/grpc v1.26.0
 	gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce
+	gorm.io/driver/mysql v1.0.3
+	gorm.io/driver/postgres v1.0.5
+	gorm.io/gorm v1.20.8
 	honnef.co/go/tools v0.0.1-2020.1.4 // indirect
 )
 

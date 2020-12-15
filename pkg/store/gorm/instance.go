@@ -27,10 +27,10 @@ func Configs() map[string]interface{} {
 func Stats() (stats map[string]interface{}) {
 	stats = make(map[string]interface{})
 	instances.Range(func(key, val interface{}) bool {
-		name := key.(string)
-		db := val.(*DB)
+		//name := key.(string)
+		//db := val.(*DB)
 
-		stats[name] = db.DB().Stats()
+		//stats[name] = db.DB().Stats()
 		return true
 	})
 

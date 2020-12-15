@@ -23,7 +23,7 @@ import (
 	"github.com/cebrains/jupiter/pkg/conf"
 	"github.com/cebrains/jupiter/pkg/util/xtime"
 	"github.com/cebrains/jupiter/pkg/xlog"
-	_ "github.com/lib/pq"
+	_ "gorm.io/driver/postgres"
 )
 
 // StdConfig 标准配置，规范配置文件头
@@ -72,10 +72,10 @@ type Config struct {
 	// select * from aid = 288016;
 	DetailSQL bool `json:"detailSql" toml:"detailSql"`
 
-	raw          interface{}
-	logger       *xlog.Logger
-	interceptors []Interceptor
-	dsnCfg       *DSN
+	raw    interface{}
+	logger *xlog.Logger
+	//interceptors []Interceptor
+	dsnCfg *DSN
 }
 
 // DefaultConfig 返回默认配置
@@ -104,23 +104,23 @@ func (config *Config) WithLogger(log *xlog.Logger) *Config {
 }
 
 // WithInterceptor ...
-func (config *Config) WithInterceptor(intes ...Interceptor) *Config {
-	if config.interceptors == nil {
-		config.interceptors = make([]Interceptor, 0)
-	}
-	config.interceptors = append(config.interceptors, intes...)
-	return config
-}
+//func (config *Config) WithInterceptor(intes ...Interceptor) *Config {
+//	if config.interceptors == nil {
+//		config.interceptors = make([]Interceptor, 0)
+//	}
+//	config.interceptors = append(config.interceptors, intes...)
+//	return config
+//}
 
 // Build ...
 func (config *Config) Build() *DB {
 	var err error
 	switch config.Dialect {
 	case "postgres":
-		config.dsnCfg, err = ParseDSN(config.DSN)
+		config.dsnCfg, err = ParsePostgresDSN(config.DSN)
 		break
 	case "mysql":
-		config.dsnCfg, err = ParsePostgresDSN(config.DSN)
+		config.dsnCfg, err = ParseDSN(config.DSN)
 		break
 	}
 	if err == nil {
@@ -129,16 +129,16 @@ func (config *Config) Build() *DB {
 		config.logger.Panic(ecode.MsgClientDatabaseOpenStart, xlog.FieldMod("gorm"), xlog.FieldErr(err))
 	}
 
-	if config.Debug {
-		config = config.WithInterceptor(debugInterceptor)
-	}
-	if !config.DisableTrace {
-		config = config.WithInterceptor(traceInterceptor)
-	}
-
-	if !config.DisableMetric {
-		config = config.WithInterceptor(metricInterceptor)
-	}
+	//if config.Debug {
+	//	config = config.WithInterceptor(debugInterceptor)
+	//}
+	//if !config.DisableTrace {
+	//	config = config.WithInterceptor(traceInterceptor)
+	//}
+	//
+	//if !config.DisableMetric {
+	//	config = config.WithInterceptor(metricInterceptor)
+	//}
 
 	db, err := Open(config.Dialect, config)
 	if err != nil {
@@ -151,7 +151,7 @@ func (config *Config) Build() *DB {
 		}
 	}
 
-	if err := db.DB().Ping(); err != nil {
+	if _, err := db.DB(); err != nil {
 		config.logger.Panic("ping database", xlog.FieldMod("gorm"), xlog.FieldErrKind(ecode.ErrKindRequestErr), xlog.FieldErr(err), xlog.FieldValueAny(config))
 	}
 
